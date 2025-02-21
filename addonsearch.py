@@ -11,10 +11,6 @@ index = client.index("addons")
 async def addonsearch(ctx, query, limit=1):
     request = index.search(query, {"limit": limit})
     data = request.get("hits", [])  # Safely get 'hits' (default to empty list if not found)
-    
-    with open("response.json", "w") as f:
-        json.dump(data, f, indent=4)
-    await send_embeds(ctx, data)  # Pass the hits data to send_embeds
     return data
 
 async def send_embeds(message, data):
