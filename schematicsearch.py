@@ -1,22 +1,23 @@
-import discord
 import meilisearch
-import json
-import dotenv
+import discord
 import os
-dotenv.load_dotenv()
+
+# Charger la configuration de Meilisearch depuis les variables d'environnement
 client = meilisearch.Client(os.getenv("SEARCH-URL"), os.getenv("SEARCH-TOKEN"))
-loaders = ["forge", "neoforge", "fabric", "quilt"]
 index = client.index("schematics")
 
-async def schematicsearch(ctx, query, limit=1):
+async def schematicsearch(interaction: discord.Interaction, query: str, limit: int = 1):
+    # Effectuer la recherche dans Meilisearch
     request = index.search(query, {"limit": limit})
-    data = request.get("hits", [])  # Safely get 'hits' (default to empty list if not found)
-    await send_embeds(ctx.message, data)
+    data = request.get("hits", [])
+    
+    # Envoyer la réponse sous forme d'embed
+    await send_embeds(interaction, data)
 
-async def send_embeds(message, data):
-    for mod_data in data:  # `data` is a list of addon dictionaries
+async def send_embeds(interaction: discord.Interaction, data):
+    for mod_data in data:
         embed = await gen_embed(mod_data)
-        await message.reply(embed=embed)
+        await interaction.followup.send(embed=embed)  # Utiliser followup.send() après defer()
 
 def format_loaders(loaders):
     if not loaders:
@@ -24,14 +25,11 @@ def format_loaders(loaders):
     return " ".join([f"{loader}" for loader in loaders])
 
 async def gen_embed(data):
-    loaders_field = format_loaders(data.get("modloaders", []))  # Use `.get()` for safety
+    loaders_field = format_loaders(data.get("modloaders", []))
     embed = discord.Embed(title=data["title"], description=data["description"], color=0x689AEE)
-    embed.set_author(name=data["authors"][0])
-    embed.set_thumbnail(url=data["image_url"])
+    embed.set_author(name=data["$id"])
+    embed.set_thumbnail(url=data.get("image_urls", [None])[0])
     embed.add_field(name="Loaders", value=loaders_field, inline=False)
     embed.add_field(name="Download", value=f"https://nottelling.youthe.schematic/schematics/{data['slug']}", inline=False)
-    embed.add_field(name="Author", value=f"Author: {data['authors'][0]}")
     embed.set_footer(text=f"Downloads: {data['downloads']}")
     return embed
-
-
