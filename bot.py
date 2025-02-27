@@ -1,24 +1,29 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 from colorama import Back, Style
 from addonsearch import addonsearch
 from schematicsearch import schematicsearch
 import dotenv
 import os
+
 dotenv.load_dotenv()
 
 intents = discord.Intents.default()
-intents.message_content = True  # Required for reading user messages
+intents.message_content = True
 bot = commands.Bot(command_prefix="??", intents=intents)
 
+# Remove the old help command
 bot.remove_command("help")
 
 @bot.event
 async def on_ready():
+    # Synchronize slash commands with Discord
+    await bot.tree.sync()
     print(f"{Back.GREEN}Logged in as {bot.user}{Style.RESET_ALL}")
 
-@bot.command()
-async def help(ctx):
+@bot.tree.command(name="help", description="Displays the list of available commands")
+async def help_command(interaction: discord.Interaction):
     embed = discord.Embed(
         title="Commands available",
         description="Addons & Schematics commands",
@@ -26,12 +31,12 @@ async def help(ctx):
     )
     embed.add_field(
         name="Addon Commands",
-        value="??addon search <query> [how many default=1] - Search for addons on Blueprint.",
+        value="/addon search <query> [limit=1] - Search for addons on Blueprint.",
         inline=False
     )
     embed.add_field(
         name="Schematic Commands",
-        value="??schematic search <query> [how many default=1]",
+        value="/schematic search <query> [limit=1]",
         inline=False
     )
     embed.add_field(
@@ -39,57 +44,61 @@ async def help(ctx):
         value="""
         <> - needed
         [] - optional
-""",
+        """,
         inline=False
     )
-    await ctx.reply(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
-# Create "addon" group command
-@bot.group(invoke_without_command=True)
-async def addon(ctx):
-    await ctx.send("Use `??addon search <query>` to find addons.")
-
-@bot.group(invoke_without_command=True)
-async def schematic(ctx):
-    await ctx.send("Use `??schematic search <query>` to find schematics.")
-
-# Subcommand for "addon"
-@addon.command()
-async def search(ctx, *, query: str):
-    # Extract the number of results from the end of the query (if available)
-    parts = query.split()
-    if parts[-1].isdigit():
-        limit = int(parts[-1])
-        query = " ".join(parts[:-1])  # Remove the number from the query
-    else:
-        limit = 1  # Default to 1 result if no number is specified
-    
-    # Ensure the limit is between 1 and 5
+# Slash command for addon search
+@bot.tree.command(name="addon", description="Manages commands related to addons")
+async def addon_command(interaction: discord.Interaction, query: str, limit: int = 1):
     limit = max(1, min(limit, 5))
     
-    msg = await ctx.send(f"Searching for {limit} addon(s) related to: `{query}`")
-    await msg.delete(delay=3)
-
-    await addonsearch(ctx=ctx, query=query, limit=limit)
-
-# Subcommand for "schematic"
-@schematic.command()
-async def search(ctx, *, query: str):
-    # Extract the number of results from the end of the query (if available)
-    parts = query.split()
-    if parts[-1].isdigit():
-        limit = int(parts[-1])
-        query = " ".join(parts[:-1])  # Remove the number from the query
-    else:
-        limit = 1  # Default to 1 result if no number is specified
+    # Defer the response to avoid InteractionResponded error
+    await interaction.response.defer(ephemeral=True)
     
-    # Ensure the limit is between 1 and 5
+    # Search for addons
+    await addonsearch(interaction=interaction, query=query, limit=limit)
+
+# Slash command for schematic search
+@bot.tree.command(name="schematic", description="Manages commands related to schematics")
+async def schematic_command(interaction: discord.Interaction, query: str, limit: int = 1):
     limit = max(1, min(limit, 5))
     
-    msg = await ctx.send(f"Searching for {limit} schematic(s) related to: `{query}`")
-    await msg.delete(delay=3)
+    # Defer the response to avoid InteractionResponded error
+    await interaction.response.defer(ephemeral=True)
     
-    # Fetch data
-    await schematicsearch(ctx=ctx, query=query, limit=limit)
+    # Search for schematics
+    await schematicsearch(interaction=interaction, query=query, limit=limit)
+
+@bot.tree.command(name="link", description="Displays the link to the official website")
+async def site_command(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Official Website",
+        description="Visit our website to discover more addons and schematics!",
+        color=discord.Color.blue(),
+        url="https://your-website.com"  # Replace with your actual URL
+    )
+    
+    # Add an image to the embed (optional)
+    embed.set_thumbnail(url="https://your-website.com/logo.png")  # Replace with your logo URL
+    
+    # Add additional information
+    embed.add_field(
+        name="Latest Updates",
+        value="Check out the latest addons and schematics added to our site!",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="Support",
+        value="Need help? Visit our forum or contact us directly on the site.",
+        inline=False
+    )
+    
+    # Add a footer
+    embed.set_footer(text="© 2025 Your Name - All rights reserved")
+    
+    await interaction.response.send_message(embed=embed)
 
 bot.run(os.getenv("TOKEN"))
